@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Ledger</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* bg-gray-900 */
+            padding-top: 72px; /* space for sticky top header */
+            line-height: 1.5;
+        }
+        .card {
+            background-color: #1F2937; /* bg-gray-800 */
+            border: 1px solid #374151; /* border-gray-700 */
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+        }
+        .btn {
+            color: white;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem; /* rounded-lg */
+            transition: background-color 0.2s ease-in-out;
+            border: 1px solid transparent;
+            cursor: pointer;
+            outline: none;
+        }
+        .btn:disabled {
+            background-color: #4b5563;
+            cursor: not-allowed;
+        }
+        .btn-primary { background-color: #4F46E5; /* bg-indigo-600 */ }
+        .btn-primary:hover:not(:disabled) { background-color: #4338CA; /* bg-indigo-700 */ }
+        .btn-secondary { background-color: #374151; border-color: #4b5563; }
+        .btn-secondary:hover:not(:disabled) { background-color: #4b5563; }
+        .btn-success { background-color: #16a34a; }
+        .btn-success:hover { background-color: #15803d; }
+        .btn:focus-visible { box-shadow: 0 0 0 3px rgba(99,102,241,0.5); }
+    .btn-icon { padding: 0.25rem; width: 2rem; height: 2rem; border-radius: 9999px; display: grid; place-items: center; }
+        .table-header { background-color: #374151; }
+        .table-row { border-bottom: 1px solid #374151; }
+        .table-row:last-child { border-bottom: none; }
+        .input-field {
+            background-color: #374151;
+            border: 1px solid #4b5563;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            color: white;
+            width: 100%;
+            outline: none;
+        }
+        .input-field:disabled {
+            background-color: #4b5563;
+            cursor: not-allowed;
+        }
+        .input-field::placeholder { color: #9CA3AF; }
+        .input-field:focus-visible { border-color: #6366F1; box-shadow: 0 0 0 3px rgba(99,102,241,0.35); }
+        /* prevent summary numbers from being truncated or overlapped */
+        .summary-value {
+            white-space: nowrap;
+            overflow: visible;
+            text-overflow: clip;
+            display: inline-block;
+            padding-right: 0.5rem;
+        }
+        /* make table cells a touch roomier for readability */
+        thead th.p-3, tbody td.p-3, tfoot td.p-2 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+        @media (max-width: 640px) {
+            thead th.p-3, tbody td.p-3 { padding-left: 0.5rem; padding-right: 0.5rem; }
+        }
+        /* layout for the small summary cards: flex and wrap to avoid overlap */
+        .summary-cards {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: stretch;
+        }
+        .summary-card {
+            min-width: 120px;
+            flex: 1 1 120px;
+        }
+    /* calendar styles */
+    .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-day { background:#111827; border:1px solid #374151; padding:8px; min-height:60px; color:#d1d5db; border-radius:6px; }
+    .cal-day .date { font-size:12px; color:#9ca3af; }
+    .cal-day .events { margin-top:6px; font-size:12px; }
+        /* right column: make it independently scrollable on large screens so the left column content can extend without forcing tiny mobile-like scrolls */
+        .right-column { max-height: calc(100vh - 160px); overflow: auto; padding-right: 6px; }
+        @media (max-width: 1024px) {
+            .right-column { max-height: none; overflow: visible; padding-right: 0; }
+            .cal-day { min-height: 48px; padding:6px; }
+        }
+        /* show due banner as a fixed toast to avoid layout shifts */
+        #due-banner { position: fixed; bottom: 16px; right: 16px; max-width: 22rem; z-index: 1000; }
+        @media (max-width: 640px) {
+            #due-banner { left: 12px; right: 12px; bottom: 12px; max-width: none; }
+        }
+        /* make summary numbers slightly smaller on narrow screens so decimals fit */
+        @media (max-width: 640px) {
+            .summary-value { font-size: 0.95rem; }
+            .text-2xl.summary-value { font-size: 1.25rem; }
+        }
+    /* Toast notifications */
+    #toast-stack { position: fixed; top: 76px; right: 16px; z-index: 1100; display: flex; flex-direction: column; gap: 8px; }
+    .toast { min-width: 260px; max-width: 360px; color: #e5e7eb; background: #111827; border: 1px solid #374151; border-left-width: 4px; border-radius: 10px; padding: 10px 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.45); animation: toast-in 180ms ease-out; }
+    .toast.info { border-left-color: #3b82f6; }
+    .toast.success { border-left-color: #10b981; }
+    .toast.warning { border-left-color: #f59e0b; }
+    .toast.error { border-left-color: #ef4444; }
+    .toast .title { font-weight: 600; margin-bottom: 2px; }
+    .toast .msg { font-size: 0.9rem; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    /* invalid input highlight */
+    .input-invalid { border-color: #ef4444 !important; box-shadow: 0 0 0 1px #ef4444 inset; }
+    </style>
+</head>
+<body class="text-gray-200">
+    <!-- Sticky Top Header -->
+    <nav class="sticky top-0 z-50 bg-gradient-to-r from-indigo-600 to-purple-700 shadow-lg border-b border-indigo-400/30">
+        <div class="mx-auto max-w-7xl px-4 md:px-6 lg:px-8 py-3">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <div class="text-xl md:text-2xl font-bold text-white">Finance Ledger</div>
+                    <div class="text-xs md:text-sm text-indigo-100/90">Track your spending, save your history, achieve your goals.</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="container mx-auto max-w-7xl p-4 md:p-6 lg:p-8">
+    <!-- Toasts container -->
+    <div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+        <header class="mb-6 flex flex-col sm:flex-row justify-between items-center">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4 w-full justify-between">
+                <div id="history-selector-container" class="text-center sm:text-left flex items-center gap-2">
+                    <button id="prev-month-btn" class="btn btn-secondary btn-icon" aria-label="Previous month" title="Previous month">◀</button>
+                    <select id="month-selector" class="input-field" title="Select month"></select>
+                    <button id="next-month-btn" class="btn btn-secondary btn-icon" aria-label="Next month" title="Next month">▶</button>
+                </div>
+            </div>
+            <div id="due-banner" class="w-full mt-3 hidden">
+                <!-- due notifications rendered here -->
+            </div>
+            <div class="flex gap-2 items-center">
+                <button id="save-month-btn" class="btn btn-success mt-4 sm:mt-0">End & Save Month</button>
+                <select id="overall-range-select" class="input-field mt-4 sm:mt-0 w-auto" title="Select overall range">
+                    <option value="3m">Last 3 months</option>
+                    <option value="6m">Last 6 months</option>
+                    <option value="1y" selected>Last 1 year</option>
+                    <option value="5y">Last 5 years</option>
+                </select>
+                <button id="export-overall-expenses-btn" class="btn btn-secondary mt-4 sm:mt-0">Download Overall Expenses</button>
+                <button id="reset-data-btn" class="btn btn-secondary mt-4 sm:mt-0">Reset All Data</button>
+            </div>
+        </header>
+        <!-- Viewing mode banner -->
+        <div id="view-mode-banner" class="card p-3 mb-4 hidden">
+            <div class="flex items-center justify-between gap-3">
+                <div class="text-sm text-blue-200">Viewing history month: <span id="view-mode-label" class="font-semibold text-white"></span> — editing is disabled.</div>
+                <button id="back-to-current-btn" class="btn btn-secondary btn-icon" aria-label="Back to current month" title="Back to current month">⤴</button>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Left & Center Column -->
+            <div class="lg:col-span-2 flex flex-col gap-6">
+                <!-- Accounts & Income -->
+                <div class="card p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                        <div>
+                            <label for="monthly-income" class="block text-sm font-medium text-gray-300 mb-1">Add Income (₹)</label>
+                            <div class="flex gap-2">
+                                <input type="number" id="monthly-income" name="monthly-income" placeholder="e.g., 50000" class="input-field">
+                                <button id="add-income-btn" class="btn btn-primary">Add</button>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-2">Add salary or other income. It will credit the selected bank account.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Select Bank Account</label>
+                            <div class="flex gap-2 items-center">
+                                <button id="add-account-open" class="btn btn-secondary">Add</button>
+                            </div>
+                            <p id="account-balance" class="text-sm text-gray-400 mt-2">Balance: ₹0.00</p>
+                            <div id="account-list" class="mt-2 flex gap-2 flex-nowrap md:flex-wrap overflow-x-auto"></div>
+                        </div>
+                        <div class="summary-cards mt-4 md:mt-0">
+                            <div class="text-center p-3 bg-gray-900 rounded-lg summary-card">
+                                <div class="flex items-center justify-center gap-2">
+                                    <span class="text-sm font-medium text-gray-400">Income (month)</span>
+                                    <button id="toggle-income-visibility" class="btn btn-secondary px-2 py-1 text-xs" aria-pressed="false" aria-label="Hide income">👁️</button>
+                                </div>
+                                <p id="summary-income" class="text-lg font-bold text-green-400 summary-value" aria-live="polite">₹0.00</p>
+                            </div>
+                            <div class="text-center p-3 bg-gray-900 rounded-lg summary-card">
+                                <div class="flex items-center justify-center gap-2">
+                                    <span class="text-sm font-medium text-gray-400">Spent</span>
+                                    <button id="toggle-spent-visibility" class="btn btn-secondary px-2 py-1 text-xs" aria-pressed="false" aria-label="Hide spent">👁️</button>
+                                </div>
+                                <p id="summary-spent" class="text-lg font-bold text-red-400 summary-value" aria-live="polite">₹0.00</p>
+                            </div>
+                            <div class="text-center p-3 bg-gray-900 rounded-lg summary-card">
+                                <div class="flex items-center justify-center gap-2">
+                                    <span id="summary-total-label" class="text-sm font-medium text-gray-400">Total</span>
+                                    <button id="toggle-total-visibility" class="btn btn-secondary px-2 py-1 text-xs" aria-pressed="false" aria-label="Hide total">
+                                        👁️
+                                    </button>
+                                </div>
+                                <p id="summary-remaining" class="text-2xl font-bold text-blue-400 summary-value" aria-live="polite">₹0.00</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Expense Ledger -->
+                <div class="card p-6">
+                    <div class="flex items-center justify-between mb-4 gap-3">
+                        <h2 class="text-xl font-bold text-white">Expense Ledger</h2>
+                        <button id="download-expense-ledger-btn" class="btn btn-secondary">Download Expense Ledger (CSV)</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                <thead class="table-header">
+                                <tr>
+                                    <th class="p-3">Date</th>
+                                    <th class="p-3">Description</th>
+                                    <th class="p-3">Category</th>
+                    <th class="p-3">Account</th>
+                    <th class="p-3 text-right">Amount (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expense-table-body">
+                                <!-- Dynamic rows here -->
+                            </tbody>
+                            <tfoot id="expense-form-footer">
+                                <!-- Input row -->
+                                <tr id="add-expense-row">
+                                    <td class="p-2"><input type="text" id="expense-desc" name="expense-desc" placeholder="Add Description" class="input-field" aria-label="Expense description"></td>
+                                    <td class="p-2">
+                                        <select id="expense-cat" class="input-field">
+                                          <option>Groceries</option><option>Dining Out</option><option>Rent</option><option>Utilities</option><option>Transportation</option><option>Shopping</option><option>Entertainment</option><option>Health</option><option>Education</option><option>Miscellaneous</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-2 align-middle"><div id="input-account-label" class="text-sm text-gray-400">—</div></td>
+                                    <td class="p-2"><input type="number" id="expense-amount" name="expense-amount" placeholder="Amount" class="input-field text-right" aria-label="Expense amount"></td>
+                                </tr>
+                                <tr>
+                                     <td colspan="4" class="pt-3"><button id="add-expense-btn" class="btn btn-primary w-full">Add Expense</button></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="lg:col-span-1 flex flex-col gap-6 right-column">
+                <!-- Account Add Modal (simple inline) -->
+                <div id="account-add-card" class="card p-6 hidden">
+                    <h3 class="font-bold text-white mb-3">Add Bank Account</h3>
+                    <input id="new-account-name" name="new-account-name" class="input-field mb-2" placeholder="Account name (e.g., SBI Savings)" aria-label="New account name">
+                    <input id="new-account-balance" name="new-account-balance" type="number" class="input-field mb-2" placeholder="Initial balance (₹)" aria-label="New account initial balance">
+                    <div class="flex gap-2">
+                        <button id="save-account-btn" class="btn btn-primary">Save</button>
+                        <button id="cancel-account-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- Allocation Section -->
+                <div id="allocation-card" class="card p-6">
+                    <h2 class="text-xl font-bold text-white mb-4">Allocate Remaining Funds</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="allocate-invest" class="block text-sm font-medium text-gray-300 mb-1">Invest / Goal</label>
+                            <div class="flex gap-2">
+                                <input type="number" id="allocate-invest" name="allocate-invest" placeholder="Amount" class="input-field" aria-label="Allocate to invest amount">
+                                <button class="btn btn-secondary allocate-btn" data-desc="Investment" data-cat="Investment">Allocate</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="allocate-home" class="block text-sm font-medium text-gray-300 mb-1">Send Home</label>
+                            <div class="flex gap-2">
+                                <input type="number" id="allocate-home" name="allocate-home" placeholder="Amount" class="input-field" aria-label="Allocate to family amount">
+                                <button class="btn btn-secondary allocate-btn" data-desc="Sent to Family" data-cat="Family">Allocate</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings -->
+                <div id="settings-card" class="card p-6">
+                    <h2 class="text-xl font-bold text-white mb-4">Settings</h2>
+                    <label class="flex items-center gap-2 text-sm text-gray-300">
+                        <input id="toggle-due-toast" type="checkbox" class="accent-indigo-600">
+                        Hide due banner/toast
+                    </label>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <button id="backup-btn" class="btn btn-secondary">Download Backup (JSON)</button>
+                        <button id="restore-btn" class="btn btn-secondary">Restore Backup</button>
+                        <input id="restore-file" type="file" accept="application/json" class="hidden" />
+                    </div>
+                </div>
+                 <!-- Goals Section -->
+                <div class="card p-6">
+                    <h2 class="text-xl font-bold text-white mb-4">Your Goals</h2>
+                    <div id="goals-container" class="space-y-4">
+                        <!-- Dynamic goals -->
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-gray-700">
+                        <h3 class="text-sm font-medium text-gray-300 mb-2">Create New Goal</h3>
+                        <input id="new-goal-name" name="new-goal-name" class="input-field mb-2" placeholder="Goal name (e.g., Vacation)" aria-label="New goal name">
+                        <input id="new-goal-target" name="new-goal-target" type="number" class="input-field mb-2" placeholder="Target amount (₹)" aria-label="New goal target amount">
+                        <div class="flex gap-2">
+                            <select id="new-goal-account" class="input-field"></select>
+                            <button id="create-goal-btn" class="btn btn-primary">Create</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Recurring / Common Expenses -->
+                <div id="recurring-card" class="card p-6">
+                    <h2 class="text-xl font-bold text-white mb-4">Common / Recurring Expenses</h2>
+                    <div id="recurring-list" class="space-y-3 mb-4">
+                        <!-- recurring items -->
+                    </div>
+                    <div class="pt-3 border-t border-gray-700">
+                        <h3 class="text-sm font-medium text-gray-300 mb-2">Create Recurring Expense</h3>
+                        <input id="rec-name" name="rec-name" class="input-field mb-2" placeholder="Name (e.g., Rent)" aria-label="Recurring expense name">
+                        <input id="rec-amount" name="rec-amount" type="number" class="input-field mb-2" placeholder="Amount (₹) — for fixed; optional for variable" aria-label="Recurring amount">
+                        <select id="rec-type" class="input-field mb-2"><option value="fixed">Fixed (auto)</option><option value="variable">Variable (default estimate)</option></select>
+                        <div class="flex gap-2 mb-2">
+                            <input id="rec-occ" name="rec-occ" type="number" class="input-field" placeholder="Occurrences (months) e.g., 60" aria-label="Recurring occurrences">
+                            <select id="rec-interval" class="input-field"><option value="1">Monthly</option><option value="3">Quarterly</option><option value="12">Yearly</option></select>
+                        </div>
+                        <input id="rec-default-est" name="rec-default-est" type="number" class="input-field mb-2" placeholder="Default estimate for variable (₹)" aria-label="Recurring default estimate">
+                        <select id="rec-account" name="rec-account" class="input-field mb-2" aria-label="Recurring linked account"></select>
+                        <div class="flex gap-2">
+                            <label class="text-sm text-gray-300 flex items-center"><input type="checkbox" id="rec-auto" name="rec-auto" class="mr-2">Auto-pay when income arrives</label>
+                            <button id="create-rec-btn" class="btn btn-primary">Create</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Due Dashboard -->
+                <div id="due-dashboard-card" class="card p-6">
+                    <h2 class="text-xl font-bold text-white mb-4">Monthly Due Dashboard</h2>
+                    <div id="due-details" class="text-sm text-gray-300 mb-4">No dues</div>
+                    <div id="calendar-container" class="w-full">
+                        <!-- calendar rendered here -->
+                    </div>
+                </div>
+                 <!-- Spending Chart -->
+                <div class="card p-6">
+                    <h2 class="text-xl font-bold text-white mb-4">Spending Breakdown</h2>
+                    <div class="relative h-64">
+                        <canvas id="expense-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- DOM REFERENCES ---
+    const monthlyIncomeInput = document.getElementById('monthly-income');
+    const addIncomeBtn = document.getElementById('add-income-btn');
+    const summaryIncomeEl = document.getElementById('summary-income');
+    const summarySpentEl = document.getElementById('summary-spent');
+    const summaryRemainingEl = document.getElementById('summary-remaining');
+    const expenseTableBody = document.getElementById('expense-table-body');
+    const expenseFormFooter = document.getElementById('expense-form-footer');
+    const allocationCard = document.getElementById('allocation-card');
+    const expenseDescInput = document.getElementById('expense-desc');
+    const expenseCatSelect = document.getElementById('expense-cat');
+    const expenseAmountInput = document.getElementById('expense-amount');
+    const addExpenseBtn = document.getElementById('add-expense-btn');
+    const goalsContainerEl = document.getElementById('goals-container');
+    const expenseChartCanvas = document.getElementById('expense-chart').getContext('2d');
+    const saveMonthBtn = document.getElementById('save-month-btn');
+    const monthSelector = document.getElementById('month-selector');
+    const prevMonthBtn = document.getElementById('prev-month-btn');
+    const nextMonthBtn = document.getElementById('next-month-btn');
+    const backToCurrentBtn = document.getElementById('back-to-current-btn');
+    const accountSelector = document.getElementById('account-selector');
+    const accountBalanceEl = document.getElementById('account-balance');
+    const addAccountOpenBtn = document.getElementById('add-account-open');
+    const accountAddCard = document.getElementById('account-add-card');
+    const saveAccountBtn = document.getElementById('save-account-btn');
+    const cancelAccountBtn = document.getElementById('cancel-account-btn');
+    const newAccountName = document.getElementById('new-account-name');
+    const newAccountBalance = document.getElementById('new-account-balance');
+
+    // --- STATE MANAGEMENT ---
+    let state = {};
+
+    let expenseChart;
+
+    const initialState = {
+        currentMonth: {
+            monthlyIncome: 0,
+            incomes: [],
+            expenses: []
+        },
+    // Tracks which calendar month the current ledger represents (e.g., "2025-8").
+    // This advances one month when you click "End & Save Month".
+    currentMonthKey: null,
+        monthlyHistory: [],
+    goals: {},
+    accounts: [], // {name, balance}
+        selectedAccount: null
+    ,recurringExpenses: [] // {id,name,amount,type:'fixed'|'variable',occurrencesLeft,linkedAccount,autoPay,lastPaidMonth}
+    ,ui: { totalHidden: false, incomeHidden: false, spentHidden: false }
+    };
+
+    // ensure an initial in-memory state so handlers can use state.accounts before loadData runs
+    // loadData() will overwrite this with saved state if present
+    state = JSON.parse(JSON.stringify(initialState));
+
+    // --- HELPERS ---
+    const formatCurrency = (amount) => `₹${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const saveData = () => localStorage.setItem('financeLedgerStateClean', JSON.stringify(state));
+
+    const loadData = () => {
+        const savedState = JSON.parse(localStorage.getItem('financeLedgerStateClean'));
+        state = savedState ? savedState : JSON.parse(JSON.stringify(initialState));
+        // normalize older or partial saved states by ensuring required keys exist
+        for (const k in initialState) {
+            if (state[k] === undefined) {
+                // deep copy simple structures
+                state[k] = JSON.parse(JSON.stringify(initialState[k]));
+            }
+        }
+    // ensure nested ui key exists
+    if (!state.ui) state.ui = { totalHidden: false, incomeHidden: false, spentHidden: false };
+    if (typeof state.ui.totalHidden !== 'boolean') state.ui.totalHidden = false;
+    if (typeof state.ui.incomeHidden !== 'boolean') state.ui.incomeHidden = false;
+    if (typeof state.ui.spentHidden !== 'boolean') state.ui.spentHidden = false;
+    // ensure we have a currentMonthKey; default to real current month if missing
+    if (!state.currentMonthKey || !/^\d{4}-\d{1,2}$/.test(state.currentMonthKey)) {
+        state.currentMonthKey = getCurrentMonthKey();
+        saveData();
+    }
+    };
+
+    // --- UI helpers: toasts and invalid input highlighting ---
+    const showToast = (message, opts = {}) => {
+        const { type = 'error', title, timeout = 3000 } = opts;
+        const stack = document.getElementById('toast-stack');
+        if (!stack) { alert(message); return; }
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.innerHTML = `${title ? `<div class="title">${title}</div>` : ''}<div class="msg">${message}</div>`;
+        stack.appendChild(el);
+        setTimeout(() => { el.style.opacity='0'; el.style.transform='translateY(-6px)'; setTimeout(()=> el.remove(), 180); }, timeout);
+    };
+
+    const setInvalid = (el, on = true) => {
+        if (!el) return;
+        el.classList.toggle('input-invalid', !!on);
+    };
+
+    // Ensure we have a sensible default selected account when loading older state
+    const ensureDefaultAccountSelection = () => {
+        if (state.accounts && state.accounts.length > 0 && (state.selectedAccount === null || state.selectedAccount === 'none')) {
+            state.selectedAccount = 0;
+            saveData();
+        }
+    };
+
+    const monthKeyToLabel = (key) => {
+        if (!key) return new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+        const [y, m] = key.split('-').map(Number);
+        const d = new Date(y, (m-1), 1);
+        return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+    };
+
+    // Render the month selector (current + history) with explicit month label for current.
+    const renderMonthSelector = () => {
+        if (!monthSelector) return;
+        // preserve current selection while rebuilding options
+        const prevVal = monthSelector.value;
+        monthSelector.innerHTML = '';
+        const cur = document.createElement('option');
+        cur.value = 'current';
+        cur.textContent = `Current Month (${monthKeyToLabel(state.currentMonthKey)})`;
+        monthSelector.appendChild(cur);
+        if (state.monthlyHistory && state.monthlyHistory.length > 0) {
+            state.monthlyHistory.forEach((m, idx) => {
+                const o = document.createElement('option');
+                o.value = String(idx);
+                o.textContent = m.monthName || (`History ${idx+1}`);
+                monthSelector.appendChild(o);
+            });
+        }
+        // try to keep previously selected value if valid
+        if (prevVal && (prevVal === 'current' || state.monthlyHistory[parseInt(prevVal)])) {
+            monthSelector.value = prevVal;
+        } else {
+            monthSelector.value = 'current';
+        }
+
+        // Update prev/next button states
+        if (prevMonthBtn && nextMonthBtn) {
+            const sel = monthSelector.value;
+            const maxIdx = (state.monthlyHistory||[]).length - 1;
+            // when on current, prev is enabled if history exists; next is disabled
+            if (sel === 'current') {
+                prevMonthBtn.disabled = maxIdx < 0;
+                nextMonthBtn.disabled = true;
+            } else {
+                const idx = parseInt(sel);
+                // prev: move to older history (higher index), disabled if already at oldest
+                prevMonthBtn.disabled = isNaN(idx) || (idx >= maxIdx);
+                // next: move to newer (lower index) or current; disabled only if somehow invalid
+                nextMonthBtn.disabled = isNaN(idx);
+            }
+        }
+    };
+
+    // Render the top summary: income, spent and remaining. Also update selected account balance display.
+    const renderSummary = (monthlyIncome, expenses) => {
+        const income = Number(monthlyIncome) || 0;
+        const spent = (expenses || []).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+        // Total = sum of all account balances
+        const total = (state.accounts || []).reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
+    if (summaryIncomeEl) summaryIncomeEl.textContent = (state.ui && state.ui.incomeHidden) ? '•••••' : formatCurrency(income);
+    if (summarySpentEl) summarySpentEl.textContent = (state.ui && state.ui.spentHidden) ? '•••••' : formatCurrency(spent);
+        if (summaryRemainingEl) {
+            if (state.ui && state.ui.totalHidden) {
+                summaryRemainingEl.textContent = '•••••';
+            } else {
+                summaryRemainingEl.textContent = formatCurrency(total);
+            }
+        }
+        // account balance display
+        if (accountBalanceEl) {
+            if (state.accounts && state.selectedAccount !== null && state.accounts[state.selectedAccount]) {
+                accountBalanceEl.textContent = `Balance: ${formatCurrency(state.accounts[state.selectedAccount].balance)}`;
+            } else if (state.accounts && state.accounts.length === 0) {
+                accountBalanceEl.textContent = 'Balance: ₹0.00';
+            }
+        }
+    };
+
+    // Account helpers
+    const addAccount = (name, balance) => {
+    if (!state.accounts || !Array.isArray(state.accounts)) state.accounts = [];
+    state.accounts.push({ name, balance: Number(balance) });
+    // select the newly added account
+    state.selectedAccount = state.accounts.length - 1;
+        saveData();
+        renderAll();
+    };
+
+    const selectAccount = (idx) => {
+    const i = Number(idx);
+    if (isNaN(i) || !state.accounts[i]) return;
+    state.selectedAccount = i;
+    // update select control immediately
+    if (accountSelector) accountSelector.value = String(i);
+    saveData();
+    renderAll();
+    };
+
+    // --- RENDER FUNCTIONS ---
+    const renderAll = () => {
+        renderMonthSelector();
+
+        const selectedMonth = monthSelector.value;
+        let dataToRender;
+
+        if (selectedMonth === 'current') {
+            dataToRender = state.currentMonth;
+            toggleInputs(false);
+        } else {
+            dataToRender = state.monthlyHistory[parseInt(selectedMonth)];
+            toggleInputs(true);
+        }
+
+        if (!dataToRender) {
+            dataToRender = state.currentMonth;
+            monthSelector.value = 'current';
+            toggleInputs(false);
+        }
+
+        renderSummary(dataToRender.monthlyIncome, dataToRender.expenses);
+        renderExpenseTable(dataToRender.expenses);
+        renderGoals();
+    renderRecurringExpenses();
+    renderDueDashboard();
+    renderChart(dataToRender.expenses);
+    // render accounts via the shared renderer (global) so account-list buttons are populated
+    if (typeof renderAccounts === 'function') renderAccounts();
+
+    // Clarify which month we will save
+    if (saveMonthBtn) {
+        saveMonthBtn.textContent = `End & Save ${monthKeyToLabel(getLedgerMonthKey())}`;
+    }
+
+    // Viewing banner: show when not current
+    const viewBanner = document.getElementById('view-mode-banner');
+    const viewLabel = document.getElementById('view-mode-label');
+    if (viewBanner && viewLabel) {
+        if (selectedMonth === 'current') {
+            viewBanner.classList.add('hidden');
+        } else {
+            const idx = parseInt(selectedMonth);
+            const m = state.monthlyHistory[idx];
+            viewLabel.textContent = (m && m.monthName) ? m.monthName : `History ${idx+1}`;
+            viewBanner.classList.remove('hidden');
+        }
+    }
+
+    };
+
+    // render expense table safely
+    const renderExpenseTable = (expenses) => {
+        if (!expenseTableBody) return;
+        expenseTableBody.innerHTML = '';
+    const getAcctName = (i) => (state.accounts && state.accounts[i]) ? state.accounts[i].name : '';
+    (expenses || []).forEach(exp => {
+            const row = document.createElement('tr');
+            row.className = 'border-t border-gray-800';
+            row.innerHTML = `
+        <td class="p-3 text-gray-400">${exp.date ? new Date(exp.date).toLocaleString() : new Date().toLocaleString()}</td>
+        <td class="p-3">${exp.description || ''}</td>
+        <td class="p-3 text-gray-400">${exp.category || ''}</td>
+        <td class="p-3 text-gray-400">${getAcctName(exp.account)}</td>
+        <td class="p-3 text-right font-medium">${formatCurrency(exp.amount || 0)}</td>
+            `;
+            expenseTableBody.appendChild(row);
+        });
+        // Update input account label to reflect selected account
+        const lbl = document.getElementById('input-account-label');
+        if (lbl) {
+            if (state.selectedAccount !== null && state.accounts[state.selectedAccount]) {
+                lbl.textContent = state.accounts[state.selectedAccount].name;
+            } else {
+                lbl.textContent = '—';
+            }
+        }
+    };
+
+    const renderGoals = () => {
+        goalsContainerEl.innerHTML = '';
+        for (const key in state.goals) {
+            const goal = state.goals[key];
+            const progress = goal.target > 0 ? (goal.current / goal.target) * 100 : 0;
+            const goalEl = document.createElement('div');
+            goalEl.innerHTML = `
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-medium text-sm">${goal.name}</span>
+                        <span class="text-xs text-gray-400">${formatCurrency(goal.current)} / ${formatCurrency(goal.target)}</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2">
+                        <div class="bg-indigo-600 h-2 rounded-full" style="width: ${Math.min(progress, 100)}%"></div>
+                    </div>
+                    <div class="flex gap-2 mt-2 items-center">
+                        <input type="number" placeholder="Add amount" class="input-field text-xs p-2 flex-grow" data-goal-key="${key}-input" id="goal-${key}-input" name="goal-${key}-input" aria-label="Add to ${goal.name}">
+                        <select class="input-field text-xs" data-goal-key="${key}-acct" id="goal-${key}-acct" name="goal-${key}-acct">
+                            <!-- accounts populated dynamically -->
+                        </select>
+                        <button class="btn btn-secondary text-xs add-to-goal-btn" data-goal-key="${key}">Add</button>
+                    </div>
+                </div>
+            `;
+            goalsContainerEl.appendChild(goalEl);
+        }
+        populateGoalAccountSelectors();
+    };
+
+    const populateGoalAccountSelectors = () => {
+        document.querySelectorAll('[data-goal-key$="-acct"]').forEach(sel => {
+            const key = sel.getAttribute('data-goal-key').replace('-acct','');
+            sel.innerHTML = '';
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = 'use-selected';
+            defaultOpt.textContent = '-- Use selected account --';
+            sel.appendChild(defaultOpt);
+            state.accounts.forEach((acct, idx) => {
+                const o = document.createElement('option');
+                o.value = idx;
+                o.textContent = acct.name;
+                sel.appendChild(o);
+            });
+            // set selected if goal has linkedAccount
+            if (state.goals[key] && state.goals[key].linkedAccount !== null) {
+                sel.value = state.goals[key].linkedAccount;
+            } else {
+                sel.value = 'use-selected';
+            }
+            sel.addEventListener('change', (e) => {
+                const v = e.target.value;
+                state.goals[key].linkedAccount = v === 'use-selected' ? null : (isNaN(parseInt(v)) ? null : parseInt(v));
+                saveData();
+            });
+        });
+    };
+
+    const renderChart = (expenses) => {
+        const expenseData = expenses.reduce((acc, t) => {
+            acc[t.category] = (acc[t.category] || 0) + t.amount;
+            return acc;
+        }, {});
+        const labels = Object.keys(expenseData);
+        const data = Object.values(expenseData);
+        if (expenseChart) expenseChart.destroy();
+        expenseChart = new Chart(expenseChartCanvas, {
+            type: 'doughnut',
+            data: { labels, datasets: [{ data, backgroundColor: ['#4F46E5','#7C3AED','#DB2777','#F97316','#F59E0B','#10B981','#3B82F6','#6366F1'], borderColor: '#1F2937', borderWidth: 2 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '70%' }
+        });
+    };
+
+    const renderAccounts = () => {
+        // If a select exists, populate it; otherwise just update the balance and buttons
+        if (accountSelector) {
+            accountSelector.innerHTML = '';
+            if (!state.accounts || state.accounts.length === 0) {
+                accountSelector.innerHTML = '<option value="none">-- No account --</option>';
+                if (accountBalanceEl) accountBalanceEl.textContent = 'Balance: ₹0.00';
+            } else {
+                ensureDefaultAccountSelection();
+                state.accounts.forEach((acct, idx) => {
+                    const o = document.createElement('option');
+                    o.value = idx;
+                    o.textContent = `${acct.name} — ${formatCurrency(acct.balance)}`;
+                    accountSelector.appendChild(o);
+                });
+                accountSelector.value = state.selectedAccount;
+                accountSelector.style.color = '#ffffff';
+            }
+        } else {
+            // no select: still ensure balance label is set when no accounts
+            if ((!state.accounts || state.accounts.length === 0) && accountBalanceEl) {
+                accountBalanceEl.textContent = 'Balance: ₹0.00';
+            }
+        }
+        // populate quick account-list buttons (primary selection UI)
+        const list = document.getElementById('account-list');
+        if (list) {
+            list.innerHTML = '';
+            if (state.accounts && state.accounts.length > 0) {
+                state.accounts.forEach((acct, idx) => {
+                    const b = document.createElement('button');
+                    b.className = 'btn btn-secondary text-xs';
+                    b.textContent = `${acct.name}`;
+                    b.setAttribute('data-idx', idx);
+                    if (String(state.selectedAccount) === String(idx)) b.classList.add('bg-indigo-600');
+                    b.addEventListener('click', (ev) => { const i = ev.currentTarget.getAttribute('data-idx'); selectAccount(i); });
+                    list.appendChild(b);
+                });
+            }
+        }
+        populateNewGoalAccountSelect();
+        populateGoalAccountSelectors();
+        populateRecurringAccountSelect();
+    };
+
+    const populateRecurringAccountSelect = () => {
+        const sel = document.getElementById('rec-account');
+        if (!sel) return;
+        sel.innerHTML = '';
+        const none = document.createElement('option'); none.value='none'; none.textContent='-- select account --'; sel.appendChild(none);
+        state.accounts.forEach((acct, idx) => { const o=document.createElement('option'); o.value=idx; o.textContent=acct.name; sel.appendChild(o); });
+    };
+
+    const renderRecurringExpenses = () => {
+        const list = document.getElementById('recurring-list');
+        if (!list) return;
+        list.innerHTML = '';
+        if (!state.recurringExpenses || state.recurringExpenses.length===0) {
+            list.innerHTML = '<div class="text-sm text-gray-400">No recurring expenses configured.</div>';
+            return;
+        }
+        state.recurringExpenses.forEach((r, idx) => {
+            const el = document.createElement('div');
+            el.className = 'p-3 bg-gray-900 rounded-lg flex justify-between items-center';
+            const left = document.createElement('div');
+            left.innerHTML = `<div class="font-medium">${r.name}</div><div class="text-xs text-gray-400">${r.type} • ${r.occurrencesLeft} months left</div>`;
+            const right = document.createElement('div');
+            const amountText = r.type==='fixed' ? `${formatCurrency(r.amount)}` : `<input id="rec-input-${idx}" name="rec-input-${idx}" data-rec-idx="${idx}" class="input-field text-xs mr-2" placeholder="Enter amount" aria-label="Enter amount for ${r.name}">`;
+            right.innerHTML = `${amountText} <button class="btn btn-secondary btn-mark-paid" data-rec-idx="${idx}">Mark Paid</button> <button class="btn btn-secondary btn-del-rec" data-rec-idx="${idx}">Delete</button>`;
+            el.appendChild(left); el.appendChild(right);
+            // show warning badges for due and insufficient funds
+            if (r.occurrencesLeft>0 && (!r.lastPaidMonth || r.lastPaidMonth !== getCurrentMonthKey())) {
+                const warn = document.createElement('div'); warn.className='text-xs text-yellow-300 ml-2'; warn.textContent='Payment due - please transfer'; left.appendChild(warn);
+                const acctIdx = (r.linkedAccount!==null && state.accounts[r.linkedAccount]) ? r.linkedAccount : state.selectedAccount;
+                const amtNeeded = r.type==='fixed' ? r.amount : (r.defaultEstimate || 0);
+                if (acctIdx!==null && state.accounts[acctIdx] && amtNeeded>0 && state.accounts[acctIdx].balance < amtNeeded) {
+                    const badge = document.createElement('div'); badge.className='text-xs text-red-300 ml-2'; badge.textContent='Insufficient balance'; left.appendChild(badge);
+                }
+            }
+            list.appendChild(el);
+        });
+    };
+
+    const getCurrentMonthKey = () => {
+        const d = new Date(); return `${d.getFullYear()}-${d.getMonth()+1}`;
+    };
+
+    // Use the tracked ledger month if available, else fall back to real current month
+    const getLedgerMonthKey = () => {
+        return (state && state.currentMonthKey) ? state.currentMonthKey : getCurrentMonthKey();
+    };
+
+    const createRecurring = () => {
+        const name = document.getElementById('rec-name').value.trim();
+        const amount = parseFloat(document.getElementById('rec-amount').value) || 0;
+        const type = document.getElementById('rec-type').value;
+        const occ = parseInt(document.getElementById('rec-occ').value) || 0;
+        const acctVal = document.getElementById('rec-account').value;
+        const auto = document.getElementById('rec-auto').checked;
+    if (!name || occ<=0) { showToast('Enter a valid name and occurrences (months).', { type:'error', title:'Invalid recurring' }); return; }
+        const linked = acctVal==='none' ? null : parseInt(acctVal);
+    const interval = parseInt(document.getElementById('rec-interval').value) || 1;
+    const defaultEst = parseFloat(document.getElementById('rec-default-est').value) || 0;
+    state.recurringExpenses.push({ id: Date.now(), name, amount, type, occurrencesLeft: occ, intervalMonths: interval, defaultEstimate: defaultEst, linkedAccount: linked, autoPay: auto, lastPaidMonth: null, nextDueKey: getLedgerMonthKey() });
+        saveData(); renderAll();
+    };
+
+    const processDueRecurringExpenses = () => {
+        // called after income is added; attempt to auto-pay recurring expenses that are due and autoPay=true
+    const monthKey = getLedgerMonthKey();
+        state.recurringExpenses.forEach((r) => {
+            if (r.occurrencesLeft<=0) return;
+            if (r.lastPaidMonth === monthKey) return; // already paid this month
+            if (!r.autoPay) return;
+            // determine amount; for variable we may have a defaultEstimate
+            const amt = r.type==='fixed' ? r.amount : (r.defaultEstimate || 0);
+            if (amt<=0) return;
+            const acctIdx = (r.linkedAccount!==null && state.accounts[r.linkedAccount]) ? r.linkedAccount : state.selectedAccount;
+            if (acctIdx===null || !state.accounts[acctIdx]) return;
+            // if sufficient balance, deduct and mark paid
+            if (state.accounts[acctIdx].balance >= amt) {
+                state.accounts[acctIdx].balance -= amt;
+                state.currentMonth.expenses.push({ description: `${r.name} (auto)`, category: r.name, amount: amt, account: acctIdx });
+                r.occurrencesLeft -= 1;
+                r.lastPaidMonth = monthKey;
+                // compute next due key based on interval
+                r.nextDueKey = addMonthsToKey(monthKey, r.intervalMonths);
+            } else {
+                // insufficient funds – leave warning
+            }
+        });
+        saveData(); renderAll();
+    };
+
+    const addMonthsToKey = (key, months) => {
+        const [y,m] = key.split('-').map(Number);
+        const total = (y*12 + (m-1)) + months;
+        const ny = Math.floor(total/12);
+        const nm = (total % 12) + 1;
+        return `${ny}-${nm}`;
+    };
+
+    const renderDueDashboard = () => {
+        const dashboard = document.getElementById('recurring-card');
+        if (!dashboard) return;
+        const lkey = getLedgerMonthKey();
+        const dueThisMonth = state.recurringExpenses.filter(r => r.occurrencesLeft>0 && (r.nextDueKey===lkey || (!r.nextDueKey && (!r.lastPaidMonth || r.lastPaidMonth!==lkey))));
+        const banner = document.getElementById('due-banner');
+        if (banner) {
+            if (dueThisMonth.length>0 && !(state.ui && state.ui.hideDueBanner)) {
+                banner.classList.remove('hidden');
+                banner.innerHTML = `
+                    <div class="p-3 bg-yellow-900 rounded text-yellow-100 shadow-lg flex items-start gap-3">
+                        <div class="flex-1 text-sm">You have ${dueThisMonth.length} recurring payment(s) due. Open the Common / Recurring Expenses panel to mark paid or enable auto-pay.</div>
+                        <button id="dismiss-due-banner" class="btn btn-secondary px-2 py-1 text-xs">✕</button>
+                    </div>`;
+            } else { banner.classList.add('hidden'); banner.innerHTML=''; }
+        }
+        renderDueDetails();
+        renderCalendar();
+        notifyDueItems(dueThisMonth);
+    };
+
+    const renderDueDetails = () => {
+        const el = document.getElementById('due-details');
+        if (!el) return;
+        const lkey = getLedgerMonthKey();
+        const dueThisMonth = state.recurringExpenses.filter(r => r.occurrencesLeft>0 && (r.nextDueKey===lkey || (!r.nextDueKey && (!r.lastPaidMonth || r.lastPaidMonth!==lkey))));
+        if (dueThisMonth.length===0) { el.textContent='No dues for this month.'; return; }
+        el.innerHTML = dueThisMonth.map(r => `${r.name}: ${r.type==='fixed'?formatCurrency(r.amount):(r.defaultEstimate?formatCurrency(r.defaultEstimate):'Enter amount')} • ${r.occurrencesLeft} left`).join('<br>');
+    };
+
+    // --- EXPORTS ---
+    const downloadBlob = (content, filename, mime='application/json') => {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+        a.remove(); URL.revokeObjectURL(url);
+    };
+
+    const exportSelectedMonth = () => {
+        // Determine selected month data
+        let label = 'Current Month';
+        let data = state.currentMonth;
+        const sel = monthSelector ? monthSelector.value : 'current';
+        if (sel !== 'current') {
+            const idx = parseInt(sel);
+            if (!isNaN(idx) && state.monthlyHistory[idx]) {
+                data = state.monthlyHistory[idx];
+                label = state.monthlyHistory[idx].monthName || `History ${idx+1}`;
+            }
+        } else {
+            // derive current month name
+            label = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+        }
+        // Build export payload
+        const exportPayload = {
+            exportType: 'month',
+            monthLabel: (sel === 'current') ? monthKeyToLabel(state.currentMonthKey) : label,
+            generatedAt: new Date().toISOString(),
+            summary: {
+                income: Number(data.monthlyIncome) || 0,
+                spent: (data.expenses||[]).reduce((s,e)=> s + (Number(e.amount)||0), 0)
+            },
+            incomes: (data.incomes||[]).map(i => ({ description: i.description || 'Income', amount: Number(i.amount)||0, date: i.date || null })),
+            expenses: (data.expenses||[]).map(e => ({ description: e.description||'', category: e.category||'', amount: Number(e.amount)||0, date: e.date || null, account: e.account??null }))
+        };
+    const labelForFile = (sel === 'current') ? monthKeyToLabel(state.currentMonthKey) : label;
+    const safeLabel = labelForFile.replace(/[^a-z0-9\-\s_]+/gi,'').replace(/\s+/g,'_');
+        const filename = `finance_${safeLabel}.json`;
+    downloadBlob(JSON.stringify(exportPayload, null, 2), filename);
+    };
+
+    // Export only the Expense Ledger as CSV for the selected month
+    const exportExpenseLedgerCSV = () => {
+        // Get data + label based on selected month
+        let label = 'Current Month';
+        let data = state.currentMonth;
+        const sel = monthSelector ? monthSelector.value : 'current';
+        if (sel !== 'current') {
+            const idx = parseInt(sel);
+            if (!isNaN(idx) && state.monthlyHistory[idx]) {
+                data = state.monthlyHistory[idx];
+                label = state.monthlyHistory[idx].monthName || `History ${idx+1}`;
+            }
+        } else {
+            label = monthKeyToLabel(state.currentMonthKey);
+        }
+
+        const rows = [];
+        const getAcctName = (i) => (state.accounts && state.accounts[i]) ? state.accounts[i].name : '';
+        // Header
+        rows.push(['Date','Description','Category','Amount (₹)','Account']);
+        // Data rows
+        (data.expenses || []).forEach(e => {
+            const dateStr = e.date ? new Date(e.date).toLocaleString() : '';
+            const desc = e.description || '';
+            const cat = e.category || '';
+            const amt = formatCurrency(Number(e.amount) || 0);
+            const acct = getAcctName(e.account);
+            rows.push([dateStr, desc, cat, amt, acct]);
+        });
+
+        // CSV escaping for commas, quotes, and newlines
+        const escapeCSV = (val) => {
+            const s = (val ?? '').toString();
+            if (/[",\n\r]/.test(s)) {
+                return '"' + s.replace(/"/g, '""') + '"';
+            }
+            return s;
+        };
+        const csv = rows.map(r => r.map(escapeCSV).join(',')).join('\r\n'); // CRLF for Windows
+
+        const safeLabel = label.replace(/[^a-z0-9\-\s_]+/gi,'').replace(/\s+/g,'_');
+        const filename = `expense_ledger_${safeLabel}.csv`;
+        // Prepend BOM so Excel opens UTF-8 properly
+        const content = '\uFEFF' + csv;
+        downloadBlob(content, filename, 'text/csv;charset=utf-8');
+    };
+
+    const exportToExcel = () => {
+        if (typeof XLSX === 'undefined') { showToast('Excel export not available.', { type:'error', title:'Export' }); return; }
+    const wb = XLSX.utils.book_new();
+        // Helpers for safe, unique sheet names
+        const sanitizeName = (name) => (name || '').toString().replace(/[\\\/*?\[\]:]/g, '').trim();
+        const uniqueSheetName = (desired) => {
+            const maxLen = 31;
+            const base = sanitizeName(desired).slice(0, maxLen);
+            let name = base || 'Sheet';
+            const existing = new Set(wb.SheetNames || []);
+            if (!existing.has(name)) return name;
+            let i = 2;
+            while (true) {
+                const suffix = ` (${i++})`;
+                const cut = Math.max(0, maxLen - suffix.length);
+                const candidate = (base.slice(0, cut) || 'Sheet').slice(0, cut) + suffix;
+                if (!existing.has(candidate)) return candidate;
+            }
+        };
+
+    // We'll append Accounts later so the first visible sheet is Current Expenses
+    const aoaAccounts = [['Name','Balance']].concat((state.accounts||[]).map(a=>[a.name, Number(a.balance)||0]));
+
+        const toDateStr = (ts) => ts ? new Date(ts).toLocaleString() : '';
+        const getAcctName = (i) => (state.accounts && state.accounts[i]) ? state.accounts[i].name : '';
+
+        const makeIncomeSheet = (label, data) => {
+            const aoa = [['Date','Description','Amount']].concat((data.incomes||[]).map(i=>[toDateStr(i.date), i.description||'Income', Number(i.amount)||0]));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), uniqueSheetName(label));
+        };
+        const makeExpenseSheet = (label, data) => {
+            const aoa = [['Date','Description','Category','Amount','Account']].concat((data.expenses||[]).map(e=>[toDateStr(e.date), e.description||'', e.category||'', Number(e.amount)||0, getAcctName(e.account)]));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), uniqueSheetName(label));
+        };
+
+    // Current month – put Expenses first so Excel opens to this sheet by default
+    makeExpenseSheet('Current Expenses', state.currentMonth);
+    makeIncomeSheet('Current Incomes', state.currentMonth);
+
+    // Accounts after current month sheets
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoaAccounts), uniqueSheetName('Accounts'));
+
+        // History
+        (state.monthlyHistory||[]).forEach((m, idx) => {
+            const base = sanitizeName(m.monthName || `History ${idx+1}`);
+            makeIncomeSheet(`${base} Incomes`, m);
+            makeExpenseSheet(`${base} Expenses`, m);
+        });
+
+        // Goals
+        const aoaGoals = [['Name','Current','Target','Linked Account']].concat(Object.keys(state.goals||{}).map(k=>{
+            const g = state.goals[k];
+            const ln = (g.linkedAccount!==null && state.accounts && state.accounts[g.linkedAccount]) ? state.accounts[g.linkedAccount].name : '';
+            return [g.name, Number(g.current)||0, Number(g.target)||0, ln];
+        }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoaGoals), uniqueSheetName('Goals'));
+
+        // Recurring
+        const aoaRec = [['Name','Type','Amount/Estimate','Occurrences Left','Interval (months)','Auto Pay','Linked Account','Last Paid','Next Due']]
+            .concat((state.recurringExpenses||[]).map(r=>[
+                r.name,
+                r.type,
+                r.type==='fixed' ? (Number(r.amount)||0) : (Number(r.defaultEstimate)||0),
+                Number(r.occurrencesLeft)||0,
+                Number(r.intervalMonths)||1,
+                !!r.autoPay,
+                (r.linkedAccount!==null && state.accounts && state.accounts[r.linkedAccount]) ? state.accounts[r.linkedAccount].name : '',
+                r.lastPaidMonth||'',
+                r.nextDueKey||''
+            ]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoaRec), uniqueSheetName('Recurring'));
+
+        const dateTag = new Date().toISOString().slice(0,10);
+        XLSX.writeFile(wb, `finance_export_${dateTag}.xlsx`);
+    };
+
+    const exportFullBackup = () => {
+        const payload = {
+            version: 2,
+            savedAt: new Date().toISOString(),
+            state
+        };
+        downloadBlob(JSON.stringify(payload, null, 2), `finance_full_backup_${new Date().toISOString().slice(0,10)}.json`);
+    };
+
+    const restoreFromBackup = (obj) => {
+        try {
+            const payload = typeof obj === 'string' ? JSON.parse(obj) : obj;
+            const restored = payload && payload.state ? payload.state : payload;
+            if (!restored || typeof restored !== 'object') throw new Error('Invalid backup format');
+            // minimal schema guards
+            if (!restored.currentMonth || !('monthlyIncome' in restored.currentMonth) || !('expenses' in restored.currentMonth)) {
+                throw new Error('Backup missing required fields');
+            }
+            state = JSON.parse(JSON.stringify(initialState));
+            // merge with initial schema to avoid missing keys
+            state = Object.assign({}, state, restored);
+            if (!state.currentMonthKey) state.currentMonthKey = getCurrentMonthKey();
+            saveData();
+            renderAll();
+            showToast('Backup restored successfully.', { type: 'success', title: 'Restore' });
+        } catch (e) {
+            console.error(e);
+            showToast('Could not restore backup. Please check the file.', { type:'error', title:'Restore failed' });
+        }
+    };
+
+    // Build a time-bounded collection of months (current + history) within range
+    const collectMonthsInRange = (monthsBack) => {
+        // Build an array of {key,label,incomes,expenses}
+        const list = [];
+        // current first
+        list.push({ key: state.currentMonthKey, label: monthKeyToLabel(state.currentMonthKey), ...state.currentMonth });
+        // then history, newest to oldest
+        (state.monthlyHistory||[]).forEach((m, i) => {
+            const idxFromNewest = i; // stored as push order; treat 0 as oldest, so reverse later
+        });
+        const hist = (state.monthlyHistory||[]).slice().reverse(); // newest first
+        hist.forEach((m) => {
+            list.push({ key: null, label: m.monthName || 'History', incomes: m.incomes||[], expenses: m.expenses||[] });
+        });
+        // Trim to requested monthsBack (approximate by count of saved months)
+        return list.slice(0, monthsBack);
+    };
+
+    const parseRangeKey = (key) => {
+        switch (key) {
+            case '3m': return 3;
+            case '6m': return 6;
+            case '1y': return 12;
+            case '5y': return 60;
+            default: return 12;
+        }
+    };
+
+    const exportOverallExpensesExcel = (rangeKey) => {
+        if (typeof XLSX === 'undefined') { showToast('Excel export not available.', { type:'error', title:'Export' }); return; }
+        const monthsBack = parseRangeKey(rangeKey);
+        const months = collectMonthsInRange(monthsBack);
+        const wb = XLSX.utils.book_new();
+
+        // Helpers
+        const sanitizeName = (name) => (name || '').toString().replace(/[\\\/*?\[\]:]/g, '').trim();
+        const uniqueSheetName = (desired) => {
+            const maxLen = 31;
+            const base = sanitizeName(desired).slice(0, maxLen);
+            let name = base || 'Sheet';
+            const existing = new Set(wb.SheetNames || []);
+            if (!existing.has(name)) return name;
+            let i = 2;
+            while (true) {
+                const suffix = ` (${i++})`;
+                const cut = Math.max(0, maxLen - suffix.length);
+                const candidate = (base.slice(0, cut) || 'Sheet').slice(0, cut) + suffix;
+                if (!existing.has(candidate)) return candidate;
+            }
+        };
+        const toDateStr = (ts) => ts ? new Date(ts).toLocaleString() : '';
+        const getAcctName = (i) => (state.accounts && state.accounts[i]) ? state.accounts[i].name : '';
+
+        // Combined sheet: all expenses in range
+        const allRows = [['Month','Date','Description','Category','Amount','Account']];
+        months.forEach(m => {
+            (m.expenses||[]).forEach(e => {
+                allRows.push([
+                    m.label,
+                    toDateStr(e.date),
+                    e.description||'',
+                    e.category||'',
+                    Number(e.amount)||0,
+                    getAcctName(e.account)
+                ]);
+            });
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(allRows), uniqueSheetName('Overall Expenses'));
+
+        // Per-month sheets for clarity
+        months.forEach(m => {
+            const aoa = [['Date','Description','Category','Amount','Account']]
+                .concat((m.expenses||[]).map(e => [toDateStr(e.date), e.description||'', e.category||'', Number(e.amount)||0, getAcctName(e.account)]));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), uniqueSheetName(`${m.label} Expenses`));
+        });
+
+        const tag = new Date().toISOString().slice(0,10);
+        const fileRange = rangeKey.toUpperCase();
+        XLSX.writeFile(wb, `overall_expenses_${fileRange}_${tag}.xlsx`);
+    };
+
+    const renderCalendar = () => {
+        const container = document.getElementById('calendar-container');
+        if (!container) return;
+        const [yStr, mStr] = getLedgerMonthKey().split('-');
+        const year = Number(yStr); const month = Number(mStr) - 1;
+        const first = new Date(year, month, 1);
+        const startDay = first.getDay();
+        const daysInMonth = new Date(year, month+1, 0).getDate();
+        let html = '<div class="calendar">';
+        // weekday headers
+        ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d=> html += `<div class="text-xs text-gray-400">${d}</div>`);
+        for (let i=0;i<startDay;i++) html += `<div></div>`;
+        for (let d=1; d<=daysInMonth; d++) {
+            const key = `${year}-${month+1}`;
+            const lkey = getLedgerMonthKey();
+            const events = state.recurringExpenses.filter(r => r.occurrencesLeft>0 && (r.nextDueKey===key || (!r.nextDueKey && (!r.lastPaidMonth || r.lastPaidMonth!==lkey))));
+            const dayEvents = events.map(r => `<div class="text-yellow-300">${r.name}</div>`).join('');
+            html += `<div class="cal-day"><div class="date">${d}</div><div class="events">${dayEvents}</div></div>`;
+        }
+        html += '</div>';
+        container.innerHTML = html;
+    };
+
+    const requestNotificationPermission = async () => {
+        if (!('Notification' in window)) return false;
+        if (Notification.permission === 'granted') return true;
+        if (Notification.permission !== 'denied') {
+            const p = await Notification.requestPermission();
+            return p === 'granted';
+        }
+        return false;
+    };
+
+    const notifyDueItems = async (items) => {
+        if (!items || items.length===0) return;
+        const allowed = await requestNotificationPermission();
+        if (!allowed) return;
+        const title = `You have ${items.length} due payment(s)`;
+        const body = items.map(i => `${i.name}: ${i.type==='fixed'?formatCurrency(i.amount):(i.defaultEstimate?formatCurrency(i.defaultEstimate):'Enter amount')}`).join('\n');
+        new Notification(title, { body });
+    };
+
+    // mark paid handler for manual payments
+    document.addEventListener('click', (e) => {
+        if (e.target && e.target.classList.contains('btn-mark-paid')) {
+            const idx = parseInt(e.target.dataset.recIdx);
+            const rec = state.recurringExpenses[idx];
+            if (!rec) return;
+            let amt = rec.type==='fixed' ? rec.amount : parseFloat(document.querySelector(`[data-rec-idx='${idx}']`).value || 0);
+            if (isNaN(amt) || amt<=0) { showToast('Enter a valid amount for variable expense.', { type:'error', title:'Invalid amount' }); return; }
+            const acctIdx = (rec.linkedAccount!==null && state.accounts[rec.linkedAccount]) ? rec.linkedAccount : state.selectedAccount;
+            if (acctIdx===null || !state.accounts[acctIdx]) { showToast('Select or create an account first.', { type:'warning', title:'No account selected' }); return; }
+            // Prevent overdraft: do not allow deduction if insufficient funds
+            if (state.accounts[acctIdx].balance < amt) { showToast('Insufficient balance in the selected account. Cannot mark as paid.', { type:'error', title:'Overdraft blocked' }); return; }
+            state.accounts[acctIdx].balance -= amt;
+            state.currentMonth.expenses.push({ description: `${rec.name} (manual)`, category: rec.name, amount: amt, account: acctIdx });
+            rec.occurrencesLeft = Math.max(0, rec.occurrencesLeft-1);
+            rec.lastPaidMonth = getLedgerMonthKey();
+            saveData(); renderAll();
+        }
+        if (e.target && e.target.classList.contains('btn-del-rec')) {
+            const idx = parseInt(e.target.dataset.recIdx);
+            state.recurringExpenses.splice(idx,1); saveData(); renderAll();
+        }
+        if (e.target && e.target.id === 'dismiss-due-banner') {
+            if (!state.ui) state.ui = { totalHidden:false, incomeHidden:false, spentHidden:false };
+            state.ui.hideDueBanner = true; saveData();
+            const banner = document.getElementById('due-banner');
+            if (banner) { banner.classList.add('hidden'); banner.innerHTML=''; }
+        }
+    });
+
+    const toggleInputs = (disabled) => {
+        monthlyIncomeInput.disabled = disabled;
+        addIncomeBtn.disabled = disabled;
+        expenseFormFooter.style.display = disabled ? 'none' : '';
+        allocationCard.style.display = disabled ? 'none' : '';
+        document.querySelectorAll('[data-goal-key-input], .add-to-goal-btn').forEach(el => el.disabled = disabled);
+    };
+
+    // --- EVENT HANDlers ---
+    const handleAddIncome = () => {
+        const amt = parseFloat(monthlyIncomeInput.value);
+    if (isNaN(amt) || amt <= 0) { showToast('Enter a valid income amount.', { type:'error', title:'Invalid income' }); return; }
+        // credit to selected account
+    if (state.selectedAccount === null || !state.accounts[state.selectedAccount]) { showToast('Please create and select a bank account first.', { type:'warning', title:'No account selected' }); return; }
+        state.currentMonth.monthlyIncome += amt;
+    state.currentMonth.incomes.push({ description: 'Income', amount: amt, date: Date.now() });
+        state.accounts[state.selectedAccount].balance += amt;
+        saveData();
+        monthlyIncomeInput.value = '';
+    // after adding income, attempt to auto-pay recurring expenses
+    processDueRecurringExpenses();
+    renderAll();
+    };
+
+    const handleAddExpense = (desc, cat, amount) => {
+        // Validate with UI feedback
+        const descEl = document.getElementById('expense-desc');
+        const amtEl = document.getElementById('expense-amount');
+        const invalidDesc = !desc;
+        const invalidAmt = isNaN(amount) || amount <= 0;
+        setInvalid(descEl, invalidDesc);
+        setInvalid(amtEl, invalidAmt);
+        if (invalidDesc || invalidAmt) { showToast('Please enter a valid description and amount.', { type:'error', title:'Invalid expense' }); return; }
+        if (state.selectedAccount === null || !state.accounts[state.selectedAccount]) { showToast('Please create and select a bank account first.', { type:'warning', title:'No account selected' }); return; }
+        // prevent overdraft
+        if (state.accounts[state.selectedAccount].balance < amount) { showToast('Insufficient balance in the selected account.', { type:'error', title:'Overdraft blocked' }); return; }
+        // deduct from account
+        state.accounts[state.selectedAccount].balance -= amount;
+        state.currentMonth.expenses.push({ description: desc, category: cat, amount: amount, date: Date.now(), account: state.selectedAccount });
+        saveData();
+        renderAll();
+    };
+
+    const handleAllocation = (e) => {
+        if (!e.target.classList.contains('allocate-btn')) return;
+        const desc = e.target.dataset.desc;
+        const cat = e.target.dataset.cat;
+        const inputEl = e.target.previousElementSibling;
+        const amount = parseFloat(inputEl.value);
+    if (isNaN(amount) || amount <= 0) { showToast('Enter a valid amount.', { type:'error', title:'Invalid amount' }); return; }
+        handleAddExpense(desc, cat, amount);
+        inputEl.value = '';
+    };
+
+    const handleAddToGoal = (e) => {
+        if (!e.target.classList.contains('add-to-goal-btn')) return;
+        const key = e.target.dataset.goalKey;
+        const inputEl = document.querySelector(`[data-goal-key="${key}-input"]`);
+        const amount = parseFloat(inputEl.value);
+
+    if (isNaN(amount) || amount <= 0) { showToast('Please enter a valid amount to add to the goal.', { type:'error', title:'Invalid amount' }); return; }
+        // decide which account to deduct from: goal linked account, else selected account
+        const goalLinked = state.goals[key].linkedAccount;
+        const acctIdx = (goalLinked !== null && state.accounts[goalLinked]) ? goalLinked : state.selectedAccount;
+    if (acctIdx === null || !state.accounts[acctIdx]) { showToast('Please create and select a bank account or link one to this goal.', { type:'warning', title:'No account selected' }); return; }
+    // prevent overdraft
+    if (state.accounts[acctIdx].balance < amount) { showToast('Insufficient balance in the selected account.', { type:'error', title:'Overdraft blocked' }); return; }
+    state.goals[key].current += amount;
+    // deduct from chosen account
+    state.accounts[acctIdx].balance -= amount;
+    state.currentMonth.expenses.push({ description: `Contribution to ${state.goals[key].name}`, category: 'Savings', amount: amount, account: acctIdx, date: Date.now() });
+        inputEl.value = '';
+        saveData();
+        renderAll();
+    };
+
+    // create goal handler
+    const createGoalBtn = document.getElementById('create-goal-btn');
+    const newGoalNameInput = document.getElementById('new-goal-name');
+    const newGoalTargetInput = document.getElementById('new-goal-target');
+    const newGoalAccountSelect = document.getElementById('new-goal-account');
+
+    const populateNewGoalAccountSelect = () => {
+        if (!newGoalAccountSelect) return;
+        newGoalAccountSelect.innerHTML = '';
+        const noneOpt = document.createElement('option');
+        noneOpt.value = 'none';
+        noneOpt.textContent = '-- No linked account --';
+        newGoalAccountSelect.appendChild(noneOpt);
+        state.accounts.forEach((acct, idx) => {
+            const o = document.createElement('option');
+            o.value = idx;
+            o.textContent = acct.name;
+            newGoalAccountSelect.appendChild(o);
+        });
+    };
+
+    if (createGoalBtn) {
+        createGoalBtn.addEventListener('click', () => {
+            const name = (newGoalNameInput.value || '').trim();
+            const target = parseFloat(newGoalTargetInput.value) || 0;
+            const acctVal = newGoalAccountSelect ? newGoalAccountSelect.value : 'none';
+            if (!name || target <= 0) { showToast('Enter a valid goal name and target.', { type:'error', title:'Invalid goal' }); return; }
+            // generate a key
+            const keyBase = name.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+            let key = keyBase;
+            let i = 1;
+            while (state.goals[key]) { key = `${keyBase}-${i++}`; }
+            state.goals[key] = { name, current: 0, target, linkedAccount: acctVal === 'none' ? null : parseInt(acctVal) };
+            newGoalNameInput.value = '';
+            newGoalTargetInput.value = '';
+            saveData();
+            renderAll();
+        });
+    }
+
+    const handleSaveMonth = () => {
+        if (state.currentMonth.expenses.length === 0 && state.currentMonth.monthlyIncome === 0) {
+            showToast('Add income or expenses before saving the month.', { type:'error', title:'Nothing to save' });
+            return;
+        }
+        if (confirm('Are you sure you want to end this month? The current data will be saved to history, and you will start with a fresh ledger.')) {
+            const monthName = monthKeyToLabel(getLedgerMonthKey());
+            state.monthlyHistory.push({
+                ...state.currentMonth,
+                monthName: monthName
+            });
+            state.currentMonth = JSON.parse(JSON.stringify(initialState.currentMonth));
+            // advance ledger month key by one month
+            const nextKey = addMonthsToKey(getLedgerMonthKey(), 1);
+            state.currentMonthKey = nextKey;
+            monthSelector.value = 'current';
+            saveData();
+            renderAll();
+        }
+    };
+
+    // --- Account UI handlers ---
+    if (addAccountOpenBtn) addAccountOpenBtn.addEventListener('click', () => { if (accountAddCard) accountAddCard.classList.remove('hidden'); });
+    if (cancelAccountBtn) cancelAccountBtn.addEventListener('click', () => { if (accountAddCard) accountAddCard.classList.add('hidden'); if (newAccountName) newAccountName.value=''; if (newAccountBalance) newAccountBalance.value=''; });
+    if (saveAccountBtn) saveAccountBtn.addEventListener('click', () => {
+        const name = (newAccountName && newAccountName.value.trim()) || `Account ${(state.accounts||[]).length + 1}`;
+        const bal = parseFloat(newAccountBalance ? newAccountBalance.value : 0) || 0;
+        addAccount(name, bal);
+        if (newAccountName) newAccountName.value=''; if (newAccountBalance) newAccountBalance.value=''; if (accountAddCard) accountAddCard.classList.add('hidden');
+    });
+
+    if (accountSelector) accountSelector.addEventListener('change', (e) => {
+        const val = e.target.value;
+        // if placeholder selected, fallback to first account if available
+        if (val === 'none') {
+            if (state.accounts && state.accounts.length > 0) { selectAccount(0); }
+            return;
+        }
+        const idx = Number(val);
+    // ...removed debug log...
+        selectAccount(idx);
+    });
+
+    // --- INITIALIZATION ---
+    document.addEventListener('DOMContentLoaded', () => {
+        loadData();
+        renderAll();
+
+        addIncomeBtn.addEventListener('click', handleAddIncome);
+        addExpenseBtn.addEventListener('click', () => {
+             handleAddExpense(expenseDescInput.value.trim(), expenseCatSelect.value, parseFloat(expenseAmountInput.value));
+             expenseDescInput.value = '';
+             expenseAmountInput.value = '';
+        });
+    // clear invalid on input
+    if (expenseDescInput) expenseDescInput.addEventListener('input', () => expenseDescInput.classList.remove('input-invalid'));
+    if (expenseAmountInput) expenseAmountInput.addEventListener('input', () => expenseAmountInput.classList.remove('input-invalid'));
+    const createRecBtn = document.getElementById('create-rec-btn');
+    if (createRecBtn) createRecBtn.addEventListener('click', createRecurring);
+    populateNewGoalAccountSelect();
+        document.querySelector('#allocation-card').addEventListener('click', handleAllocation);
+        goalsContainerEl.addEventListener('click', handleAddToGoal);
+        saveMonthBtn.addEventListener('click', handleSaveMonth);
+        monthSelector.addEventListener('change', renderAll);
+        if (prevMonthBtn) prevMonthBtn.addEventListener('click', () => {
+            if (!monthSelector) return;
+            const sel = monthSelector.value;
+            const maxIdx = (state.monthlyHistory||[]).length - 1;
+            if (sel === 'current') {
+                if (maxIdx >= 0) monthSelector.value = String(maxIdx);
+            } else {
+                const idx = parseInt(sel);
+                if (!isNaN(idx)) {
+                    const nextIdx = Math.min(maxIdx, idx + 1);
+                    monthSelector.value = String(nextIdx);
+                }
+            }
+            renderAll();
+        });
+        if (nextMonthBtn) nextMonthBtn.addEventListener('click', () => {
+            if (!monthSelector) return;
+            const sel = monthSelector.value;
+            if (sel === 'current') return; // cannot go newer than current
+            const idx = parseInt(sel);
+            if (!isNaN(idx)) {
+                const nextIdx = idx - 1;
+                if (nextIdx >= 0) {
+                    monthSelector.value = String(nextIdx);
+                } else {
+                    monthSelector.value = 'current';
+                }
+                renderAll();
+            }
+        });
+        if (backToCurrentBtn) backToCurrentBtn.addEventListener('click', () => {
+            if (monthSelector) {
+                monthSelector.value = 'current';
+                renderAll();
+            }
+        });
+
+        // Keyboard navigation for month history: Left=Prev, Right=Next
+        document.addEventListener('keydown', (e) => {
+            if (e.target && ['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
+            if (e.key === 'ArrowLeft' && prevMonthBtn && !prevMonthBtn.disabled) {
+                prevMonthBtn.click();
+            } else if (e.key === 'ArrowRight' && nextMonthBtn && !nextMonthBtn.disabled) {
+                nextMonthBtn.click();
+            }
+        });
+    // Export Excel button removed
+    const overallRangeSelect = document.getElementById('overall-range-select');
+    const exportOverallBtn = document.getElementById('export-overall-expenses-btn');
+    if (exportOverallBtn) exportOverallBtn.addEventListener('click', () => {
+        const key = overallRangeSelect ? overallRangeSelect.value : '1y';
+        exportOverallExpensesExcel(key);
+    });
+        const resetBtn = document.getElementById('reset-data-btn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                const warn = 'This will erase all saved data in this browser.\nTo confirm, type the key exactly: DELETE';
+                const input = prompt(warn);
+                if (input !== 'DELETE') { showToast('Incorrect key. Data was not deleted.', { type:'error', title:'Reset cancelled' }); return; }
+                localStorage.removeItem('financeLedgerStateClean');
+                state = JSON.parse(JSON.stringify(initialState));
+                // reset to actual current month key
+                state.currentMonthKey = getCurrentMonthKey();
+                saveData();
+                renderAll();
+                showToast('All data has been deleted from this browser.', { type:'success', title:'Reset complete' });
+            });
+        }
+
+        // Backup/Restore handlers
+        const backupBtn = document.getElementById('backup-btn');
+        const restoreBtn = document.getElementById('restore-btn');
+        const restoreFile = document.getElementById('restore-file');
+        if (backupBtn) backupBtn.addEventListener('click', exportFullBackup);
+        if (restoreBtn && restoreFile) {
+            restoreBtn.addEventListener('click', () => restoreFile.click());
+            restoreFile.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => restoreFromBackup(ev.target.result);
+                reader.readAsText(file);
+                // reset input so same file can be chosen again later
+                e.target.value = '';
+            });
+        }
+
+    const dlExpenseBtn = document.getElementById('download-expense-ledger-btn');
+    if (dlExpenseBtn) dlExpenseBtn.addEventListener('click', exportExpenseLedgerCSV);
+
+        const setupEye = (btnId, hiddenKey, labelBase) => {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            const apply = () => {
+                const hidden = !!(state.ui && state.ui[hiddenKey]);
+                btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+                btn.setAttribute('aria-label', `${hidden ? 'Show' : 'Hide'} ${labelBase}`);
+                btn.textContent = hidden ? '🙈' : '👁️';
+            };
+            apply();
+            btn.addEventListener('click', () => {
+                if (!state.ui) state.ui = { totalHidden: false, incomeHidden: false, spentHidden: false };
+                state.ui[hiddenKey] = !state.ui[hiddenKey];
+                saveData();
+                apply();
+                renderSummary(state.currentMonth.monthlyIncome, state.currentMonth.expenses);
+            });
+        };
+        setupEye('toggle-total-visibility', 'totalHidden', 'total');
+        setupEye('toggle-income-visibility', 'incomeHidden', 'income');
+        setupEye('toggle-spent-visibility', 'spentHidden', 'spent');
+
+        // settings: hide due toast
+        const dueToggle = document.getElementById('toggle-due-toast');
+        if (dueToggle) {
+            dueToggle.checked = !!(state.ui && state.ui.hideDueBanner);
+            dueToggle.addEventListener('change', () => {
+                if (!state.ui) state.ui = { totalHidden:false, incomeHidden:false, spentHidden:false };
+                state.ui.hideDueBanner = dueToggle.checked;
+                saveData();
+                renderDueDashboard();
+            });
+        }
+    });
+</script>
+</body>
+</html>
