@@ -4,46 +4,91 @@
 
 A single-file, in-browser finance ledger to track multiple bank accounts, income, expenses, and recurring payments. No backend required—data stays in your browser.
 
-## Quick start
+# Finance Ledger
 
-- Open `index.html` in any modern browser.
-- Add a bank account, then start logging income and expenses.
-- Use the CSV/Excel exports or Backup/Restore to save or migrate data.
+Lightweight, single-file personal finance ledger you can clone and use locally. Everything runs in the browser — no server, no account required. Ideal for tracking multiple bank accounts, monthly income, expenses, recurring payments, and simple savings goals.
 
-Optional (local web server):
+This repository contains:
+- `index.html` — the entire app (HTML + CSS + JS) in one file.
+- `README.md` — this document.
+
+Quick design goals:
+- Minimal, privacy-first: all data stays in the user’s browser unless exported.
+- Portable: use the browser UI or export/import JSON/Excel for backups and migration.
+- Small surface area: no build step; open the file or serve it locally.
+
+## Quick start (clone and run)
+
+1. Clone this repository:
 
 ```powershell
-# From the project folder on Windows, using Python (if installed)
+git clone https://github.com/SanchitRawool36/expensy-tracky.git
+cd expensy-tracky
+```
+
+2. Open the app:
+
+- Option A — open directly: double-click `index.html` in your file manager and open it in a modern browser (Chrome, Edge, Firefox, Safari).
+- Option B — run a simple local web server (recommended to avoid some file:// restrictions):
+
+```powershell
+# From the project folder on Windows using Python 3
 python -m http.server 8080
-# Then open http://localhost:8080/index.html
+# then open http://localhost:8080/index.html in your browser
 ```
 
 ## Features
 
 - Multiple bank accounts with balances and quick-select chips
-- Income and expense tracking with timestamps and categories
-- Account-aware expenses (each expense records the source account)
+- Income and expense logging (timestamped) with categories and per-account tracking
+- Recurring expenses (fixed/variable) with intervals, occurrences, and optional auto-pay
+- Goals support (progress tracking and fund allocation). Default build ships with no pre-defined goals.
+- Monthly ledger history: close a month and keep a saved archive of past months
+- CSV/Excel export (current month or combined history sheets) and full JSON backup/restore
+- Simple UI with toast notifications and privacy toggles for sensitive numbers
 
-- Recurring expenses (fixed/variable), occurrences, intervals, and optional auto-pay
-- Monthly due dashboard, calendar view, and spending doughnut chart
-- Month save/close with history and fast Prev/Next navigation + banner
-- CSV export for the current month’s expense ledger (includes Account column)
-- Overall Expenses Excel export for 3m/6m/1y/5y ranges (combined sheet + per-month sheets)
-- Full JSON Backup download and one-click Restore
-- Sticky top header, mobile-friendly layout, toasts for validation/messages
-- Privacy eye-toggles for hiding totals/income/spent on screen
-- Reset is gated by a passphrase: `DELETE`
+## Important runtime details
 
-## Data storage
+- Storage: the app uses browser localStorage under the key `financeLedgerStateClean`.
+- Reset: the Reset All Data button is gated by a passphrase prompt. The current reset key in this clean build is: `DELETE` (type exactly to confirm).
+- Default goals: this build starts with an empty `goals` object (no predefined goal data).
 
-- Persistence: browser `localStorage` under key `financeLedgerStateClean`.
-- Capacity: usually about 5–10 MB per origin (varies by browser). That’s thousands of entries in practice, but not unlimited.
-- Lifetime: persists until the user clears site data; private/incognito modes do not persist after the session. Browsers may evict under storage pressure, mostly on mobile.
-- Origin-bound: data does not migrate between different URLs/domains. Use Backup/Restore to move data.
+Notes on storage and migration
+- localStorage is origin-bound. If you open the file via `file://` vs `http://localhost`, the storage will be different. Use the JSON Backup/Restore to move data between origins or machines.
+- localStorage capacity varies by browser (commonly several MB). For large exports use the provided Excel/JSON export features.
 
-## Backup and Restore
+## Privacy & security
 
-- Backup: Settings → "Download Backup (JSON)".
+All data is stored locally in the browser. This repository does not collect or transmit any personal data. Do not store secrets or sensitive authentication tokens in the app. Backups saved to JSON/Excel are unencrypted — treat them as sensitive files on your machine.
+
+## Contributing
+
+This project is intentionally small and single-file. If you'd like to contribute:
+
+1. Fork the repo and make changes on a feature branch.
+2. Keep changes focused and explain them in the PR description (UI, bugfix, accessibility, or packaging are common contributions).
+3. If you add new files or dependencies, include a short `README` section explaining how to run and test them.
+
+Suggested next improvements (low-risk):
+- Add a small automated test for the JS helpers.
+- Split JS into modules and add a build pipeline (only if the project outgrows being single-file).
+- Add a `LICENSE` file (MIT is a common permissive choice).
+
+## Troubleshooting
+
+- If the UI looks broken, try a different modern browser (Chrome, Edge, Firefox) or clear site data for the origin.
+- If backup/restore fails, open the browser console for errors (right-click → Inspect → Console). This build has minimal debug logging.
+
+## License
+
+This repository does not include a license file by default. If you plan to make it public, consider adding a license such as MIT by creating a `LICENSE` file.
+
+---
+
+If you want, I can also:
+- add an MIT `LICENSE` file,
+- create a trimmed `index-clean.html` variant with comments removed for lighter cloning,
+- or split JS into a separate `app.js` and add a minimal `package.json` to help contributors.
 - Restore: Settings → "Restore Backup" and select the backup JSON.
 - What’s included: the entire app state, including accounts, history, goals, and recurring items.
 
