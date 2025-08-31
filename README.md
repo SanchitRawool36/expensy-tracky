@@ -1,146 +1,182 @@
-
 # Finance Ledger
 
-
-A single-file, in-browser finance ledger to track multiple bank accounts, income, expenses, and recurring payments. No backend required—data stays in your browser.
-
-# Finance Ledger
-
-Lightweight, single-file personal finance ledger you can clone and use locally. Everything runs in the browser — no server, no account required. Ideal for tracking multiple bank accounts, monthly income, expenses, recurring payments, and simple savings goals.
+A lightweight, in-browser finance ledger to track bank accounts, income, expenses, goals, and recurring payments. No backend required — data stays in your browser.
 
 This repository contains:
-- `index.html` — the entire app (HTML + CSS + JS) in one file.
+- `index.html` — main app page (loads external `app.js`).
+- `index-clean.html` — trimmed production variant.
+- `app.js` — application logic.
 - `README.md` — this document.
+- `LICENSE` — MIT license.
+- `package.json` — local dev server scripts (no dependencies required).
 
 Quick design goals:
-- Minimal, privacy-first: all data stays in the user’s browser unless exported.
-- Portable: use the browser UI or export/import JSON/Excel for backups and migration.
-- Small surface area: no build step; open the file or serve it locally.
+- Privacy-first: all data remains in your browser unless you export it.
+- Portable: export/import JSON/Excel for backups and migration.
+- Zero build: open the file or serve it locally.
 
 ## Quick start (clone and run)
 
-1. Clone this repository:
+1) Clone the repo
 
 ```powershell
 git clone https://github.com/SanchitRawool36/expensy-tracky.git
 cd expensy-tracky
 ```
 
-2. Open the app:
-
-- Option A — open directly: double-click `index.html` in your file manager and open it in a modern browser (Chrome, Edge, Firefox, Safari).
-- Option B — run a simple local web server (recommended to avoid some file:// restrictions):
+2) Open the app
+- Option A — double-click `index.html` to open in a modern browser.
+- Option B — serve locally (recommended):
 
 ```powershell
-# From the project folder on Windows using Python 3
-python -m http.server 8080
-# then open http://localhost:8080/index.html in your browser
+npm start
+# opens http://localhost:5173
 ```
+
+Alternative (Python):
+```powershell
+python -m http.server 8080
+# then open http://localhost:8080/index.html
+```
+
+## Development
+
+- Use the built-in script to serve locally:
+
+```powershell
+npm start
+```
+
+- Edit `index.html` and `app.js`. The production-friendly `index-clean.html` uses the same `app.js` but with minimal markup/comments.
 
 ## Features
 
 - Multiple bank accounts with balances and quick-select chips
-- Income and expense logging (timestamped) with categories and per-account tracking
-- Recurring expenses (fixed/variable) with intervals, occurrences, and optional auto-pay
-- Goals support (progress tracking and fund allocation). Default build ships with no pre-defined goals.
-- Monthly ledger history: close a month and keep a saved archive of past months
-- CSV/Excel export (current month or combined history sheets) and full JSON backup/restore
-- Simple UI with toast notifications and privacy toggles for sensitive numbers
+- Income/expense logging with categories and per-account tracking
+- Recurring expenses (fixed/variable), intervals, occurrences, optional auto-pay
+- Goals with progress and fund allocation (no predefined goals by default)
+- Monthly ledger history with archived months
+- CSV/Excel exports and full JSON backup/restore
+- Privacy toggles and toast notifications
 
 ## Important runtime details
 
-- Storage: the app uses browser localStorage under the key `financeLedgerStateClean`.
-- Reset: the Reset All Data button is gated by a passphrase prompt. The current reset key in this clean build is: `DELETE` (type exactly to confirm).
-- Default goals: this build starts with an empty `goals` object (no predefined goal data).
+- Storage: localStorage key `financeLedgerStateClean`.
+- Reset: requires passphrase `DELETE` in the prompt.
+- Default goals: starts with an empty `goals` object.
 
 Notes on storage and migration
-- localStorage is origin-bound. If you open the file via `file://` vs `http://localhost`, the storage will be different. Use the JSON Backup/Restore to move data between origins or machines.
-- localStorage capacity varies by browser (commonly several MB). For large exports use the provided Excel/JSON export features.
+- localStorage is origin-bound (`file://` vs `http://localhost` are different). Use Backup/Restore to move data across origins or machines.
+- localStorage capacity varies by browser; for larger history use the Excel/JSON exports.
 
 ## Privacy & security
 
-All data is stored locally in the browser. This repository does not collect or transmit any personal data. Do not store secrets or sensitive authentication tokens in the app. Backups saved to JSON/Excel are unencrypted — treat them as sensitive files on your machine.
+All data is stored locally in the browser. This app does not collect or transmit personal data. Backups (JSON/Excel) are unencrypted — store them securely.
 
 ## Contributing
 
-This project is intentionally small and single-file. If you'd like to contribute:
+1) Fork and create a feature branch.
+2) Keep PRs focused and explain the change (UI, bugfix, accessibility, packaging).
+3) If adding files or deps, document how to run/test in the PR.
 
-1. Fork the repo and make changes on a feature branch.
-2. Keep changes focused and explain them in the PR description (UI, bugfix, accessibility, or packaging are common contributions).
-3. If you add new files or dependencies, include a short `README` section explaining how to run and test them.
-
-Suggested next improvements (low-risk):
-- Add a small automated test for the JS helpers.
-- Split JS into modules and add a build pipeline (only if the project outgrows being single-file).
-- Add a `LICENSE` file (MIT is a common permissive choice).
-
-## Troubleshooting
-
-- If the UI looks broken, try a different modern browser (Chrome, Edge, Firefox) or clear site data for the origin.
-- If backup/restore fails, open the browser console for errors (right-click → Inspect → Console). This build has minimal debug logging.
-
-## License
-
-This repository does not include a license file by default. If you plan to make it public, consider adding a license such as MIT by creating a `LICENSE` file.
-
----
-
-If you want, I can also:
-- add an MIT `LICENSE` file,
-- create a trimmed `index-clean.html` variant with comments removed for lighter cloning,
-- or split JS into a separate `app.js` and add a minimal `package.json` to help contributors.
-- Restore: Settings → "Restore Backup" and select the backup JSON.
-- What’s included: the entire app state, including accounts, history, goals, and recurring items.
-
-Tip: Before changing your hosting URL (e.g., GitHub Pages to Netlify), download a Backup and restore it at the new URL.
+Suggested small improvements:
+- Light unit tests for helpers
+- Optional module split/build only if the project outgrows simple static hosting
 
 ## Exports
 
-- Expense Ledger (CSV): current month; columns: Date, Description, Category, Account, Amount (₹).
-- Overall Expenses (Excel): choose 3m/6m/1y/5y range. Produces a combined sheet plus per-month sheets.
-
-## Keyboard and navigation
-
-- Month history navigation: ArrowLeft/ArrowRight to move Previous/Next.
-- Viewing banner appears when you’re not on the current month, with a quick "Back to Current".
-
-## Privacy
-
-- Eye toggles hide values for Total, Income, and Spent on-screen.
-- Local-only: no data leaves your device unless you export or deploy your site publicly.
+- Expense Ledger (CSV): current month; columns include Date, Description, Category, Account, Amount (₹)
+- Overall Expenses (Excel): pick 3m/6m/1y/5y; includes a combined sheet plus per‑month sheets
 
 ## Deploy
 
-### GitHub Pages
+GitHub Pages
+1) Push to a public repo with `index.html` at the repo root
+2) Settings → Pages → Deploy from a branch → Branch: `main` → Folder: `/ (root)`
+3) Open the published URL
 
-1) Commit `index.html` (and this README) to a GitHub repo.
-2) Settings → Pages → Build and deployment → Source = "Deploy from a branch"; Branch = `main`; Folder = `/ (root)`.
-3) Open the published URL.
-
-Note: Data saved on GitHub Pages lives in your browser for that Pages origin. It will not automatically appear on other domains.
-
-### Netlify
-
+Netlify
 - Site type: Static site
 - Build command: none
-- Publish directory: repo root (where `index.html` is)
-- Deploy via "Import from GitHub" or drag-and-drop
+- Publish directory: repo root
 
-If you later move between GitHub Pages and Netlify, use Backup/Restore to migrate your data.
+Note: Data stored on one origin (domain) won’t appear on another; use Backup/Restore to migrate.
+
+## Multi-device sync (optional backend)
+
+This app is local-first. To use it on multiple devices with the same data, add a backend to store a copy of your state and sync it.
+
+Recommended: Supabase (Postgres + Auth)
+- What you’ll build: store the entire app state (the same JSON you back up) in a `jsonb` column per user; use Row Level Security (RLS) so users can only access their own state.
+
+1) Create a Supabase project (Database + Auth enabled)
+2) Create the table (SQL)
+```
+create table if not exists public.ledger_states (
+	user_id uuid not null references auth.users(id) on delete cascade,
+	id text not null default 'default',
+	state jsonb not null,
+	updated_at timestamptz not null default now(),
+	primary key (user_id, id)
+);
+alter table public.ledger_states enable row level security;
+create policy "read own" on public.ledger_states for select using (auth.uid() = user_id);
+create policy "insert own" on public.ledger_states for insert with check (auth.uid() = user_id);
+create policy "update own" on public.ledger_states for update using (auth.uid() = user_id);
+create policy "delete own" on public.ledger_states for delete using (auth.uid() = user_id);
+```
+
+3) Add the Supabase client to the app (CDN) and wire a minimal login + sync
+- Add the script (public anon keys are safe to use client-side):
+```
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+```
+- Create the client in `app.js` with env values (e.g., injected at deploy time):
+```
+const SUPABASE_URL = window.env?.SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.env?.SUPABASE_ANON_KEY;
+const sb = (SUPABASE_URL && SUPABASE_ANON_KEY)
+	? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+	: null;
+```
+- Auth (example): magic link via email
+```
+await sb.auth.signInWithOtp({ email });
+// On callback/opened session: const { data: { user } } = await sb.auth.getUser();
+```
+- Sync strategy (simple, practical)
+	- On load: if logged in, fetch server state `select state, updated_at where id='default'`. Compare timestamps with local; if server newer, replace local; if local newer, offer to push.
+	- On every save: write localStorage, then `upsert` to Supabase with `updated_at=now()`.
+	- Conflict policy: last-write-wins is acceptable for single-user usage. For collaboration, add version numbers and a merge prompt.
+
+4) Deployment and env vars
+- Frontend (static): Vercel/Netlify. Inject `SUPABASE_URL` and `SUPABASE_ANON_KEY` as public env (client-readable).
+- Backend: Supabase is fully managed — nothing else to deploy.
+
+Alternatives
+- Firebase (Firestore + Auth): similar flow; store one doc per user with the full JSON state.
+- PocketBase (self-hosted): single binary with SQLite and auth; deploy on Fly.io/Render; expose `/api/collections/states`.
+- Appwrite: managed/self-hosted BaaS with DB + Auth.
+- Minimal custom server: Node/Express with SQLite/Postgres exposing `/state` GET/PUT for a user; deploy on Render/Fly/Heroku and protect with auth.
+
+Security notes
+- Do not commit private service keys. Client apps should only use public/anon keys meant for the browser.
+- Keep RLS on for Supabase; write policies exactly as above to restrict to `auth.uid()`.
+- Set allowed origins/CORS to your deployed frontend.
 
 ## Tech stack
 
-- Tailwind CSS (via CDN)
-- Chart.js (spending chart, via CDN)
-- SheetJS (Excel export, via CDN)
-- Plain HTML/CSS/JS in a single file (`index.html`)
+- Tailwind CSS (CDN)
+- Chart.js (CDN)
+- SheetJS (CDN)
+- Plain HTML/CSS/JS (`index.html` + `app.js`)
 
 ## Troubleshooting
 
-- Excel export not working: ensure network access to the SheetJS CDN. The app shows a toast if the library is unavailable.
-- Data missing after moving hosts: use Settings → Backup/Restore to migrate across domains.
-- Reset requires passphrase `Sanchit2005`. This is a local safeguard only.
+- Excel export issues: ensure the SheetJS CDN is reachable
+- Data missing after host change: use Backup/Restore to migrate
+- UI issues: try a modern browser or clear site data for the origin
 
----
+## License
 
-This is a local-first app. Keep regular Backups if you rely on it for important records.
+MIT — see `LICENSE`.
